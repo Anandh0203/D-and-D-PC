@@ -1,13 +1,21 @@
-import { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { UserRole, ChatMessage, MediaState } from "@/src/types";
 import { audioSynth } from "@/src/utils/audioSynth";
 import ParticleCanvas from "@/src/components/ParticleCanvas";
 import CameraSeat from "@/src/components/CameraSeat";
 import MovieScreen from "@/src/components/MovieScreen";
 import CompanionPanel, { encryptMessage } from "@/src/components/CompanionPanel";
-import { Sparkles, MonitorStop, RefreshCw, Layers, ShieldCheck, Heart, Users } from "lucide-react";
+import { Sparkles, MonitorStop, RefreshCw, Layers, ShieldCheck, Heart, Users, Lock, ChevronRight } from "lucide-react";
+import { initAuth, googleSignIn, logout } from "@/src/utils/firebaseAuth";
 
 export default function App() {
+  const [isUnlocked, setIsUnlocked] = useState(() => sessionStorage.getItem("dd_palace_unlocked") === "true");
+  const [passcode, setPasscode] = useState("");
+  const [passcodeError, setPasscodeError] = useState(false);
+
+  const [googleUser, setGoogleUser] = useState<any>(null);
+  const [googleToken, setGoogleToken] = useState<string | null>(null);
+
   const [role, setRole] = useState<UserRole | null>(null);
   const [introPlayed, setIntroPlayed] = useState(false);
   const [introStage, setIntroStage] = useState(0); // 1 to 5 for cinematic sections
@@ -78,6 +86,45 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("dd_offline_chats_queue", JSON.stringify(offlineChats));
   }, [offlineChats]);
+
+  // Google OAuth Subscription Handler
+  useEffect(() => {
+    const unsubscribe = initAuth(
+      (user, token) => {
+        setGoogleUser(user);
+        setGoogleToken(token);
+      },
+      () => {
+        setGoogleUser(null);
+        setGoogleToken(null);
+      }
+    );
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, []);
+
+  const handleGoogleSignIn = async () => {
+    try {
+      const res = await googleSignIn();
+      if (res) {
+        setGoogleUser(res.user);
+        setGoogleToken(res.accessToken);
+      }
+    } catch (err) {
+      console.error("Google sign in failure:", err);
+    }
+  };
+
+  const handleGoogleLogout = async () => {
+    try {
+      await logout();
+      setGoogleUser(null);
+      setGoogleToken(null);
+    } catch (err) {
+      console.error("Google log out failure:", err);
+    }
+  };
 
   // Unified Room State polling + Heartbeat polling
   useEffect(() => {
@@ -531,6 +578,87 @@ export default function App() {
   // RENDER FLOWS MODULE
   // -------------------------------------------------------------------------
 
+  // 0. Password Code Gate house
+  if (!isUnlocked) {
+    const handleCheckPasscode = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (passcode === "2910") {
+        setIsUnlocked(true);
+        sessionStorage.setItem("dd_palace_unlocked", "true");
+        audioSynth.playRoyalFanfare();
+      } else {
+        audioSynth.playSoftClick();
+        setPasscodeError(true);
+        setTimeout(() => setPasscodeError(false), 800);
+        setPasscode("");
+      }
+    };
+
+    return (
+      <div className="min-h-screen bg-[#060408] text-white flex flex-col items-center justify-center p-6 select-none relative overflow-hidden font-sans">
+        {/* Deep wine gold royal gradients */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(212,175,55,0.06)_0,rgba(0,0,0,0)_100%)] pointer-events-none" />
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-[#D4AF37]/2 filter blur-[130px] pointer-events-none animate-pulse" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full bg-purple-900/5 filter blur-[150px] pointer-events-none" />
+
+        <div className={`w-full max-w-md p-8 rounded-3xl border border-[#D4AF37]/20 bg-gradient-to-b from-[#140F08]/90 to-[#0B0805]/95 shadow-[0_0_50px_rgba(212,175,55,0.08)] relative z-10 flex flex-col items-center gap-6 text-center backdrop-blur-md transition-all duration-300 ${passcodeError ? "border-rose-500/50 animate-shake" : ""}`}>
+          
+          <div className="flex flex-col gap-1 items-center">
+            <div className="w-14 h-14 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/35 flex items-center justify-center mb-2 animate-pulse">
+              <Lock size={22} className="text-[#D4AF37]" />
+            </div>
+            
+            <h1 className="text-2xl sm:text-3xl font-semibold tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-yellow-100 to-amber-300">
+              Imperial Archives
+            </h1>
+            <p className="text-[10px] font-mono text-[#D4AF37]/60 tracking-widest uppercase mt-1">
+              Dobby & Duckie Sanctuary
+            </p>
+          </div>
+
+          <p className="text-xs text-white/40 max-w-xs leading-relaxed">
+            Please enter your secret sanctuary decree code to trigger grand theater openings and lower the security protocols.
+          </p>
+
+          <form onSubmit={handleCheckPasscode} className="w-full mt-2 flex flex-col gap-4">
+            <div className="relative">
+              <input
+                type="password"
+                maxLength={6}
+                value={passcode}
+                onChange={(e) => setPasscode(e.target.value)}
+                autoFocus
+                placeholder="••••"
+                className={`w-full text-center py-3.5 px-4 bg-black/50 border rounded-xl font-mono text-xl tracking-[0.3em] text-white/90 placeholder-white/20 focus:outline-none transition-all duration-300 ${
+                  passcodeError 
+                    ? "border-rose-500 text-rose-400 bg-rose-500/5" 
+                    : "border-white/10 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/30"
+                }`}
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="w-full py-3.5 rounded-xl font-semibold bg-gradient-to-r from-[#D4AF37] to-[#BC9B30] text-black hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 tracking-wider text-xs uppercase cursor-pointer"
+            >
+              Open Palace Gates <ChevronRight size={14} />
+            </button>
+          </form>
+
+          {passcodeError && (
+            <p className="text-[10px] text-rose-400 font-mono tracking-wide animate-pulse">
+              Decree code invalid. The gates remain sealed.
+            </p>
+          )}
+
+          <div className="w-full text-[9px] font-mono text-white/25 mt-2 border-t border-white/5 pt-3">
+            <span>TLS E2E ENCRYPTED CONNECTIVITY READY</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // A. Entrance Selector Screen
   if (!role) {
     return (
@@ -804,6 +932,10 @@ export default function App() {
             isOnline={isOnline}
             onSendMessage={handleSendMessage}
             onClearTheater={handleClearTheater}
+            googleUser={googleUser}
+            googleToken={googleToken}
+            onGoogleSignIn={handleGoogleSignIn}
+            onGoogleLogout={handleGoogleLogout}
           />
         </div>
       </main>

@@ -18,6 +18,94 @@ class CinematicSynth {
   }
 
   // 1. Grand Opening Theater Intro (Rising sub-bass and celestial major chord)
+  public playRoyalFanfare() {
+    this.init();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+
+    // Deep royal horn drone (resonant warmth)
+    const subOsc = this.ctx.createOscillator();
+    const subGain = this.ctx.createGain();
+    const subFilter = this.ctx.createBiquadFilter();
+
+    subOsc.type = "sawtooth";
+    subOsc.frequency.setValueAtTime(55, now); // A1 note
+    subOsc.frequency.linearRampToValueAtTime(110, now + 5); // Rise to A2
+
+    subFilter.type = "lowpass";
+    subFilter.frequency.setValueAtTime(120, now);
+    subFilter.frequency.exponentialRampToValueAtTime(350, now + 4);
+
+    subGain.gain.setValueAtTime(0, now);
+    subGain.gain.linearRampToValueAtTime(0.5, now + 1.5);
+    subGain.gain.exponentialRampToValueAtTime(0.001, now + 6);
+
+    subOsc.connect(subFilter);
+    subFilter.connect(subGain);
+    subGain.connect(this.ctx.destination);
+
+    subOsc.start(now);
+    subOsc.stop(now + 6);
+
+    // Majestic brass progression: A major to E major (A3, C#4, E4, A4 -> B3, E4, G#4, B4)
+    const chords = [
+      { delay: 0.0, freqs: [220.00, 277.18, 329.63, 440.00] }, // A chord
+      { delay: 1.5, freqs: [246.94, 329.63, 415.30, 493.88] }, // E major
+      { delay: 3.0, freqs: [220.00, 277.18, 329.63, 440.00, 554.37, 659.25] } // A major glorious ending sweep
+    ];
+
+    chords.forEach((chord) => {
+      chord.freqs.forEach((freq, idx) => {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        const filter = this.ctx.createBiquadFilter();
+
+        osc.type = "sawtooth";
+        // Slightly detuned for lush analog feel
+        osc.frequency.setValueAtTime(freq + (idx * 0.3), now + chord.delay);
+
+        filter.type = "lowpass";
+        filter.frequency.setValueAtTime(150, now + chord.delay);
+        filter.frequency.exponentialRampToValueAtTime(1500, now + chord.delay + 1.0);
+
+        gain.gain.setValueAtTime(0, now + chord.delay);
+        gain.gain.linearRampToValueAtTime(0.12, now + chord.delay + 0.3);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + chord.delay + 3.0);
+
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc.start(now + chord.delay);
+        osc.stop(now + chord.delay + 3.2);
+      });
+    });
+
+    // Regal Royal Harp/Bell cascade
+    const harpNotes = [440, 554, 659, 880, 1108, 1318, 1760];
+    harpNotes.forEach((f, idx) => {
+      if (!this.ctx) return;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(f, now + 4.0 + (idx * 0.1));
+
+      gain.gain.setValueAtTime(0, now + 4.0 + (idx * 0.1));
+      gain.gain.linearRampToValueAtTime(0.1, now + 4.0 + (idx * 0.1) + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 4.0 + (idx * 0.1) + 0.8);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      osc.start(now + 4.0 + (idx * 0.1));
+      osc.stop(now + 4.0 + (idx * 0.1) + 0.9);
+    });
+  }
+
+  // 1. Grand Opening Theater Intro (Rising sub-bass and celestial major chord)
   public playGrandOpening() {
     this.init();
     if (!this.ctx) return;

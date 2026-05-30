@@ -31,6 +31,8 @@ export default function CameraSeat({
   const lastFrameData = useRef<Uint8ClampedArray | null>(null);
 
   const [localActive, setLocalActive] = useState(0);
+  const [smileEnergy, setSmileEnergy] = useState(0);
+  const [detectedEmotion, setDetectedEmotion] = useState("Serene ✨");
 
   // Bind stream to video element
   useEffect(() => {
@@ -39,7 +41,7 @@ export default function CameraSeat({
     }
   }, [stream]);
 
-  // Motion Detection algorithm - very lightweight
+  // Motion Detection & Smile Variance algorithm - lightweight and client-side safe
   useEffect(() => {
     if (!cameraActive || !stream || !onActivityChanged) return;
 
@@ -50,6 +52,7 @@ export default function CameraSeat({
     if (!ctx) return;
 
     let isDestroyed = false;
+    let autoEmojiCooldown = 0;
 
     const detectMotion = () => {
       if (isDestroyed || !videoRef.current) return;
@@ -60,6 +63,26 @@ export default function CameraSeat({
 
         if (lastFrameData.current) {
           let totalDiff = 0;
+          let mouthBrightnessRange = 0;
+          let mouthBrightPixels = 0;
+
+          // Standard mouth grid bounding: Middle columns 10-22, lower-middle rows 12-20
+          for (let y = 12; y < 20; y++) {
+            for (let x = 10; x < 22; x++) {
+              const idx = (y * 32 + x) * 4;
+              // Extract luminance
+              const r = imgData[idx];
+              const g = imgData[idx + 1];
+              const b = imgData[idx + 2];
+              const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+              
+              if (brightness > 145) { // Potential teeth shimmer or cheeks lighting widening
+                mouthBrightPixels++;
+              }
+            }
+          }
+
+          // Full grid motion diff
           for (let i = 0; i < imgData.length; i += 4) {
             const rDiff = Math.abs(imgData[i] - lastFrameData.current[i]);
             const gDiff = Math.abs(imgData[i+1] - lastFrameData.current[i+1]);
@@ -67,16 +90,42 @@ export default function CameraSeat({
             totalDiff += (rDiff + gDiff + bDiff);
           }
           
-          // Max diff for 768 pixels is 768 * 255 * 3 = 587,520
-          // Normal movement yields 10,000 to 80,000
+          // Motion Rate
           const rate = Math.min(totalDiff / 100000, 1);
           setLocalActive(rate);
           onActivityChanged(rate);
+
+          // Smile Metric based on mouth bright energy shifts and fast motion spikes
+          const smileFactor = Math.min(mouthBrightPixels / 30, 1.0);
+          setSmileEnergy(smileFactor);
+
+          // Automatic facial sentiment solver
+          if (smileFactor > 0.65 && rate > 0.1) {
+            setDetectedEmotion("Smiling! 😊");
+            
+            // Auto trigger sweet particle cascade if cooldown is active
+            if (autoEmojiCooldown <= 0) {
+              const smileEmoji = role === "duckie" ? "🦆" : "🧝";
+              triggerEmote(smileEmoji);
+              autoEmojiCooldown = 15; // 3.75s pause spacing
+            }
+          } else if (rate > 0.45) {
+            setDetectedEmotion("Laughing! 😂");
+            if (autoEmojiCooldown <= 0) {
+              triggerEmote("💖");
+              autoEmojiCooldown = 15;
+            }
+          } else if (rate > 0.15) {
+            setDetectedEmotion("Excited! ✨");
+          } else {
+            setDetectedEmotion("Cozy 🥰");
+          }
         }
 
+        if (autoEmojiCooldown > 0) autoEmojiCooldown--;
         lastFrameData.current = imgData;
       } catch (e) {
-        // Safe catch for video tracks initialization state
+        // Safe catch for initialized video streams
       }
 
       setTimeout(detectMotion, 250);
@@ -156,6 +205,14 @@ export default function CameraSeat({
           style={{ opacity: Math.max(0, localActive - 0.1) }}
           className={`absolute inset-0 border-2 rounded-xl pointer-events-none transition-opacity duration-150 ${role === "duckie" ? "border-[#E0B974]" : "border-[#A78BFA]"}`}
         />
+
+        {/* Dynamic Face Emotion Recognition Indicator */}
+        {cameraActive && stream && (
+          <div className="absolute bottom-2 right-2 px-2.5 py-1 rounded-full bg-black/70 border border-white/10 text-[9px] font-mono tracking-wider text-white/90 shadow flex items-center gap-1 backdrop-blur-md transition-all animate-fade-in truncate select-none">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+            <span>AI Face: {detectedEmotion}</span>
+          </div>
+        )}
       </div>
 
       {/* Seat Controls Panel */}
