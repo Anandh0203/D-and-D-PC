@@ -1,0 +1,12 @@
+{
+  "name": "D_&_D_Private_Cinema",
+  "description": "A private, luxurious virtual movie theater for Duckie (aarvee) and Dobby to share screens, cameras, and watch movies together in absolute real-time.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "display-capture"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
